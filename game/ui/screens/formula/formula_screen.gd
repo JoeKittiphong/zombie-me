@@ -58,4 +58,3 @@ func save_formula() -> void:
 		title = "Experiment %03d" % (state.formulas.size()+1)
 	var result: Error = state.save_formula(title)
 	status.text = "Saved: " + title + "\nOpen Records to inspect this formula." if result == OK else "Could not save the formula. Please try again."
-

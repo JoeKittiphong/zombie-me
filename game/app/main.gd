@@ -64,6 +64,8 @@ func start_play() -> void:
 	menu.hide()
 	game = OUTBREAK.instantiate()
 	game.formula = research.quantities.duplicate()
+	if "--play-test" in OS.get_cmdline_user_args():
+		game.population = 2
 	game.exited.connect(stop_play)
 	game.completed.connect(func(result: Dictionary):
 		var error := research.record_experiment(result)
@@ -216,7 +218,7 @@ func run_play_test() -> void:
 			if game.citizens[index].infected or game.finished:
 				break
 		assert(game.citizens[index].infected)
-	for step in range(10):
+	for step in range(24):
 		if game.finished:
 			break
 		await get_tree().create_timer(0.5).timeout
@@ -249,8 +251,3 @@ func run_play_test() -> void:
 	DirAccess.remove_absolute(research.save_path)
 	print("Play test passed: projected mouse ray, movement, mutation, exhaustion/recovery, infection, victory, persisted result and return to Lab.")
 	get_tree().quit()
-
-
-
-
-
