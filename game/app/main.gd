@@ -208,6 +208,21 @@ func run_play_test() -> void:
 	for index in range(2):
 		if game.finished:
 			break
+		if game.citizens[index].infected:
+			continue
+		for recovery in range(100):
+			if not game.player.busy:
+				break
+			await get_tree().create_timer(0.1).timeout
+		assert(not game.player.busy)
+		# Humans now detect danger beyond hunt range; isolate capture from escape here.
+		# Dedicated human tests exercise escape, perception and investigation.
+		game.player.position = game.citizens[index].position.move_toward(Vector3.ZERO,2.0)
+		game.hunt_target = null
+		game.stamina = 5.0
+		game.exhausted = false
+		game.manual_grace = 1.0
+		game._process(1.0)
 		click = InputEventMouseButton.new()
 		click.button_index = MOUSE_BUTTON_LEFT
 		click.pressed = true
@@ -217,6 +232,8 @@ func run_play_test() -> void:
 			await get_tree().create_timer(0.5).timeout
 			if game.citizens[index].infected or game.finished:
 				break
+		if not game.citizens[index].infected:
+			print("Capture fixture: player=",game.player.position," target=",game.citizens[index].position," destination=",game.destination," move=",game.has_move_order," stamina=",game.stamina," exhausted=",game.exhausted," busy=",game.player.busy," human_state=",game.brains[index].human.state)
 		assert(game.citizens[index].infected)
 	for step in range(24):
 		if game.finished:

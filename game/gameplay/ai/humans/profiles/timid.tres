@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/gameplay/ai/humans/human_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+role = "timid"
+vision_range = 7.0
+smell_range = 6.5
+flees_from_smell = true
+reaction_delay = 0.15
+run_speed = 3.1
+stamina_capacity = 4.0

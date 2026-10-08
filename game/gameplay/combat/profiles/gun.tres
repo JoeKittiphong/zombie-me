@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://game/gameplay/combat/combat_profile.gd" id="1"]
+[resource]
+script = ExtResource("1")
+equipment = "gun"
+attack_range = 10.0
+preferred_distance = 5.0
+damage = 28.0
+windup = 0.35
+recovery = 0.35
+cooldown = 2.4
+reload_duration = 3.2
+knockback = 0.15
+stun_duration = 0.08

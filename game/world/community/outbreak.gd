@@ -1,13 +1,43 @@
 extends Node3D
 
+signal human_alerted(actor: CharacterBody3D)
 signal exited
 signal completed(result: Dictionary)
 
+const PROGRESS := preload("res://game/gameplay/progression/outbreak_progress.gd")
+@export var outbreak_pacing: Resource = preload("res://game/gameplay/progression/default_pacing.tres")
+var outbreak_progress := PROGRESS.new()
+
+const SWARM := preload("res://game/gameplay/combat/swarm_attacks.gd")
+const COMBAT_SYSTEM := preload("res://game/gameplay/combat/combat_system.gd")
+const COMBAT_EFFECTS := preload("res://game/gameplay/feedback/combat_effects.gd")
+var swarm_attacks := SWARM.new()
+var combat_system := COMBAT_SYSTEM.new()
+var combat_effects: Node3D
+var serum_injected := false
+var outbreak_started := false
+
 const ACTOR := preload("res://game/characters/dummy/dummy_actor.tscn")
 @export_range(2, 2000, 1) var population := 24
-@export var detailed_actor_budget := 64
+@export_range(1,128,1) var detailed_actor_budget := 32
 @export var half_bounds := Vector2(35,25)
 @export var bite_hold_duration := 1.4
+@export_flags_3d_physics var vision_collision_mask := 2
+const HUMAN_PERCEPTION := preload("res://game/gameplay/ai/humans/human_perception.gd")
+const HUMAN_FEEDBACK := preload("res://game/gameplay/feedback/human_feedback.gd")
+@export var human_profiles: Array[Resource] = [
+	preload("res://game/gameplay/ai/humans/profiles/civilian.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/elder.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/timid.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/doctor.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/police.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/bat_guard.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/armed_police.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/vaccine_medic.tres"),
+	preload("res://game/gameplay/ai/humans/profiles/armed_civilian.tres")
+]
+var human_perception := HUMAN_PERCEPTION.new()
+var human_feedback: Node3D
 const GRID := preload("res://game/gameplay/ai/actor_grid.gd")
 const CROWD_VISUALS := preload("res://game/gameplay/rendering/crowd_visuals.gd")
 var actor_grid := GRID.new()
@@ -39,6 +69,12 @@ var ui: CanvasLayer
 var back_button: Button
 
 func _ready() -> void:
+	outbreak_progress.configure(self)
+	swarm_attacks.configure(self)
+	combat_system.configure(self)
+	combat_effects = Node3D.new()
+	combat_effects.set_script(COMBAT_EFFECTS)
+	add_child(combat_effects)
 	build_world()
 	if population == 2:
 		destination = Vector3(-5,0,3)
@@ -51,16 +87,36 @@ func _ready() -> void:
 			spawn_points.append(Vector3(lerpf(-half_bounds.x+4,half_bounds.x-4,float(index%columns)/maxi(columns-1,1)),0,lerpf(-half_bounds.y+4,half_bounds.y-4,float(int(index/columns))/maxi(rows-1,1))))
 		spawn_points[0] = Vector3(-14,0,12)
 	player = make_actor(destination,Color("d9e2d0"),true)
+	player.defeated.connect(func(_actor): finish_round(false,"Patient Zero eliminated."))
+	human_feedback = Node3D.new()
+	human_feedback.set_script(HUMAN_FEEDBACK)
+	add_child(human_feedback)
+	human_feedback.configure(player)
 	var colors := [Color("df9b58"), Color("769fbd"), Color("b8829a"), Color("8fa56b")]
 	for index in range(spawn_points.size()):
 		citizens.append(make_actor(spawn_points[index],colors[index%colors.size()]))
+		if not human_profiles.is_empty():
+			citizens[index].human_profile = human_profiles[index%human_profiles.size()]
 		var brain := BRAIN.new()
 		brain.configure(citizens[index],self,spawn_points[index],index+731)
 		brains.append(brain)
+		citizens[index].defeated.connect(func(body):
+			if body.zombie:
+				transformed_count = maxi(transformed_count-1,0)
+			check_victory()
+		)
+		citizens[index].cured.connect(func(was_zombie):
+			if was_zombie:
+				transformed_count = maxi(transformed_count-1,0)
+			brain.human.change_state("wandering")
+			brain.human.seen_threat = null
+			brain.human.suspicion = 0.0
+			brain.human.danger_confirmed = false
+			brain.human.evidence_age = 100.0
+		)
 		citizens[index].became_zombie.connect(func():
 			transformed_count += 1
-			if transformed_count == citizens.size() and not finished:
-				finish_round()
+			check_victory()
 		)
 	player_roaming = BRAIN.new()
 	player_roaming.configure(player,self,destination,99173)
@@ -88,6 +144,9 @@ func make_actor(pos: Vector3, color: Color, scientist := false) -> CharacterBody
 	actor.position = pos
 	actor.setup(color,scientist)
 	actor.movement_bounds = half_bounds
+	# Ground-click rays must not hit the controlled actor itself.
+	actor.collision_layer = 4
+	actor.collision_mask = 1
 	if not scientist:
 		actor.use_flat_movement = true
 		actor.collision_layer = 0
@@ -185,7 +244,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func command_move(point: Vector3) -> void:
-	if player.busy:
+	if player.busy or player.dead:
 		return
 	has_move_order = true
 	player_roaming.has_waypoint = false
@@ -203,6 +262,13 @@ func nearest_zombie(pos: Vector3, radius: float) -> CharacterBody3D:
 
 func refresh_perception() -> void:
 	actor_grid.rebuild(player,citizens)
+	if outbreak_started and not finished:
+		var active := 1 if player.infected and not player.dead else 0
+		for actor in citizens:
+			if actor.infected and not actor.dead:
+				active += 1
+		if active == 0:
+			finish_round(false,"The outbreak was contained.")
 	var detail_candidates: Array[Vector2] = []
 	for index in range(brains.size()):
 		var actor: CharacterBody3D = citizens[index]
@@ -221,6 +287,13 @@ func refresh_perception() -> void:
 	for index in range(citizens.size()):
 		crowd_visuals.update_actor(index,citizens[index])
 func _physics_process(delta: float) -> void:
+	human_perception.begin_tick()
+	combat_system.begin_tick()
+	swarm_attacks.step(delta)
+	player.tick_conditions(delta)
+	if player.infected:
+		serum_injected = true
+		outbreak_started = true
 	spatial_clock -= delta
 	if spatial_clock <= 0:
 		refresh_perception()
@@ -232,19 +305,21 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(player):
 		return
 	elapsed += delta
+	outbreak_progress.tick(delta)
 	manual_grace = maxf(manual_grace-delta,0)
 	bite_time = maxf(bite_time-delta,0)
 	# Provisional incubation linked to formula, communicated through the body rather than a timer.
-	if elapsed >= 2.5+float(formula[2])*0.2 and not player.infected:
+	if elapsed >= 2.5+float(formula[2])*0.2 and not player.infected and not serum_injected:
+		serum_injected = true
 		player.start_mutation()
 		status.text = "The serum is taking effect..."
 	if player.zombie and not player.busy and not exhausted and not has_move_order and manual_grace <= 0:
-		if not is_instance_valid(hunt_target) or hunt_target.infected:
+		if not is_instance_valid(hunt_target) or not hunt_target.can_be_hunted():
 			hunt_target = nearest_human(player.position,5.0)
 	if exhausted or not player.zombie:
 		hunt_target = null
-	var chasing: bool = is_instance_valid(hunt_target) and not hunt_target.infected
-	if player.busy:
+	var chasing: bool = is_instance_valid(hunt_target) and hunt_target.can_be_hunted()
+	if player.busy or player.stun_time > 0.0:
 		stamina = minf(stamina + delta * 0.4, 5)
 	elif chasing:
 		player.travel(hunt_target.position,4.5,delta)
@@ -280,48 +355,8 @@ func bite(target: CharacterBody3D) -> void:
 	start_pounce(player,target)
 
 func start_pounce(attacker: CharacterBody3D, target: CharacterBody3D) -> void:
-	if target.infected or target.busy or attacker.busy:
-		return
-	attack_count += 1
-	attacker.busy = true
-	attacker.velocity = Vector3.ZERO
-	target.begin_bitten()
-	var direction := target.position-attacker.position
-	direction.y = 0
-	direction = direction.normalized() if direction.length() > 0.01 else Vector3.FORWARD
-	var side := Vector3(-direction.z,0,direction.x)
-	var landing := target.position-direction*0.45+side*0.4
-	landing.y = 0
-	var yaw := atan2(-direction.x,-direction.z)
-	attacker.visual.rotation.y = yaw
-	target.visual.rotation.y = yaw
-	if attacker == player:
-		hunt_target = null
-		marker.hide()
-		status.text = "Tackle!"
-	var sequence := create_tween()
-	sequence.tween_property(attacker,"position",landing,0.32)
-	sequence.parallel().tween_property(attacker.visual,"position:y",0.9,0.16)
-	sequence.tween_property(attacker.visual,"position:y",0.17,0.16)
-	sequence.tween_property(attacker.visual,"rotation:x",-PI/2,0.24)
-	sequence.parallel().tween_property(target.visual,"rotation:x",-PI/2,0.24)
-	sequence.parallel().tween_property(target.visual,"position:y",0.17,0.24)
-	# Both bodies are down. Small forward pulses communicate the bite.
-	for pulse in range(4):
-		sequence.tween_property(attacker.visual,"rotation:x",-PI/2+0.1,0.12)
-		sequence.tween_property(attacker.visual,"rotation:x",-PI/2,0.18)
-	sequence.tween_interval(maxf(bite_hold_duration-1.2,0))
-	sequence.tween_callback(target.begin_incubation)
-	sequence.tween_property(attacker.visual,"rotation:x",0.0,0.65)
-	sequence.parallel().tween_property(attacker.visual,"position:y",0.0,0.65)
-	sequence.tween_callback(func():
-		attacker.busy = false
-		if attacker == player:
-			destination = player.position
-			has_move_order = false
-			bite_time = 0.6
-			status.text = "The infection is taking hold..."
-	)
+	if not finished:
+		swarm_attacks.join(attacker,target)
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(player):
@@ -329,11 +364,14 @@ func _process(delta: float) -> void:
 	var focus := Vector3(player.position.x,0,player.position.z)
 	camera.position = camera.position.lerp(focus+Vector3(16,18,20),minf(delta*4,1))
 	camera.look_at(focus)
-func finish_round() -> void:
+func finish_round(won := true, reason := "All citizens infected.") -> void:
+	if finished:
+		return
 	finished = true
+	swarm_attacks.stop_all()
 	marker.hide()
-	status.text = "Outbreak complete."
-	var result := {"name": "Community outbreak", "date": Time.get_datetime_string_from_system(), "dose": formula.duplicate(), "stage": "COMMUNITY", "duration": snappedf(elapsed,0.1), "infected": citizens.size(), "outcome": "All citizens infected"}
+	status.text = "Outbreak complete." if won else reason
+	var result := {"name": "Community outbreak", "date": Time.get_datetime_string_from_system(), "dose": formula.duplicate(), "stage": "COMMUNITY", "duration": snappedf(elapsed,0.1), "infected": transformed_count, "outcome": "All citizens infected" if won else reason}
 	completed.emit(result)
 	var panel := Panel.new()
 	panel.position = Vector2(425,190)
@@ -344,7 +382,7 @@ func finish_round() -> void:
 	panel.add_theme_stylebox_override("panel",style)
 	ui.add_child(panel)
 	var title := Label.new()
-	title.text = "OUTBREAK COMPLETE\n\nAll citizens infected.\n" + ("Experiment recorded." if record_saved else "Record could not be saved.")
+	title.text = ("OUTBREAK COMPLETE" if won else "EXPERIMENT ENDED")+"\n\n"+reason+"\n" + ("Experiment recorded." if record_saved else "Record could not be saved.")
 	title.position = Vector2(28,30)
 	title.add_theme_font_size_override("font_size",23)
 	panel.add_child(title)
@@ -355,3 +393,11 @@ func finish_round() -> void:
 	back_button.pressed.connect(func(): exited.emit())
 	panel.add_child(back_button)
 	back_button.grab_focus()
+
+func check_victory() -> void:
+	if finished or not player.zombie or player.dead:
+		return
+	for actor in citizens:
+		if not actor.dead and (not actor.zombie or actor.infection_phase == "curing"):
+			return
+	finish_round()

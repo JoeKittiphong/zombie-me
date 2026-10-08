@@ -19,11 +19,11 @@ func configure(count: int) -> void:
 
 func update_actor(index: int, actor: CharacterBody3D) -> void:
 	var detailed: bool = actor.detailed_visual
-	actor.visual.visible = detailed
+	actor.set_detailed_visual(detailed)
 	var pose := Basis.from_euler(actor.visual.rotation)
 	var transform := Transform3D(pose,actor.position+actor.visual.position+pose*Vector3(0,0.85,0))
 	if detailed:
 		transform.basis = Basis.IDENTITY.scaled(Vector3.ZERO)
 	multimesh.set_instance_transform(index,transform)
-	multimesh.set_instance_color(index,actor.zombie_skin_color if actor.zombie else actor.coat_color)
+	multimesh.set_instance_color(index,Color("626858") if actor.dead else (actor.zombie_skin_color if actor.zombie else actor.coat_color))
 

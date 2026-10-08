@@ -7,11 +7,11 @@ When the controlled actor is a zombie and has no movement order, it uses the sam
 - `game/gameplay/ai/actor_grid.gd`: shared spatial hash for nearby human/zombie queries. Refresh every 0.15 seconds; query margin covers movement between refreshes. Exact squared distance and eligibility checks filter candidates.
 - `game/gameplay/ai/citizen_brain.gd`: cached perception, staggered initial checks, autonomous roaming and pursuit. Near actors move every physics tick, middle actors every 0.066 seconds, far actors every 0.2 seconds. Perception runs every 0.2 or 0.5 seconds.
 - `game/gameplay/movement/actor_motor.gd`: NPCs use direct flat-ground motion with physics collisions disabled. Player keeps floor physics. This assumes the current flat arena; slopes, obstacles and crowd avoidance require a different motor/navigation solution.
-- `game/gameplay/rendering/crowd_visuals.gd`: one low-poly MultiMesh proxy batch for distant actors. Closest NPCs within 28 units retain GLB visuals, capped at 64 by default. Distant falling/rising poses are simplified and refreshed with the spatial index. Player always retains GLB visuals.
-- `game/characters/dummy/dummy_actor.gd`: processing enabled only during infection, shared clothing materials, throttled hidden infection poses. Zombie completion signals replace whole-population victory scans.
+- `game/gameplay/rendering/crowd_visuals.gd`: one low-poly MultiMesh proxy batch for distant actors. Closest NPCs within 28 units retain GLB visuals, capped at 32 by default. Distant falling/rising poses are simplified and refreshed with the spatial index. Player always retains GLB visuals.
+- `game/characters/dummy/dummy_actor.gd`: processing enabled only during infection, shared clothing materials, throttled hidden infection poses. Zombie/cure/death signals trigger round checks; the existing spatial refresh also checks outbreak containment.
 - `game/characters/dummy/dummy_locomotion.gd`: throttled pose updates; hidden GLB models skip locomotion pose work.
 
-Set `population` (default 24, inspector range 2–2000) and `detailed_actor_budget` on the Community world. Detailed nodes remain allocated behind proxies: this reduces CPU and draw work but does not eliminate per-actor node/memory costs. Dense groups in one spatial cell can still make nearby searches expensive. No crowd separation is implemented yet.
+Set `population` (default 24, inspector range 2–2000) and `detailed_actor_budget` on the Community world. Detailed GLB branches are detached from the scene tree while proxies are active, then restored nearby. Nodes/resources remain allocated: this reduces CPU and draw work but does not eliminate per-actor node/memory costs. Dense groups in one spatial cell can still make nearby searches expensive. No crowd separation is implemented yet.
 
 ## Measurements: 2026-10-08
 
@@ -24,7 +24,7 @@ Godot 4.7.2 Compatibility, NVIDIA GTX 1660 Ti, 1000 evenly distributed actors, h
 | After optimization, graphics 180 steps; 30 warmup | 9.76 ms | 19.66 ms | 57 |
 | All 1000 incubating/convulsing, graphics; same warmup | 1.98 ms | 7.66 ms | 60 |
 
-Simulation timing surrounds only the world physics method; graphics FPS also reflects rendering and infection callbacks. Graphics runs reported 1762 draw calls. FPS is a short sample on this machine, not a guaranteed minimum. Attacks, spawn cost, memory and dense clustering need separate profiling before production scale.
+Simulation timing surrounds only the world physics method; graphics FPS also reflects rendering and infection callbacks. The historical graphics runs above reported 1762 draw calls. Current human AI, GLB detachment, the new 32-model budget and 600-step benchmark are documented in [HUMAN_BEHAVIOR.md](HUMAN_BEHAVIOR.md). FPS is a short sample on this machine, not a guaranteed minimum. Attacks, spawn cost, memory and dense clustering need separate profiling before production scale.
 
 ## Reproduce
 
@@ -42,3 +42,5 @@ godot --path . -- --play-test
 ```
 
 Grid regression compares 200 indexed queries against brute-force results and checks the visual budget. Player regression verifies roaming, click priority with a nearby target, resumed roaming and movement lock. Play smoke needs a graphical window for screen-coordinate input.
+
+Weapons and shared captures now have a separate active-combat benchmark. See [COMBAT_AND_SWARM.md](COMBAT_AND_SWARM.md) for workload bounds, measurements and reproduction.

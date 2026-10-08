@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://game/gameplay/ai/humans/human_profile.gd" id="1"]
+[ext_resource type="Resource" path="res://game/gameplay/combat/profiles/bat.tres" id="2"]
+[resource]
+script = ExtResource("1")
+role = "bat_guard"
+combat_profile = ExtResource("2")
+walk_speed = 1.4
+reaction_delay = 0.1
+vision_range = 9.0
+run_speed = 3.0

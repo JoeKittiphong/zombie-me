@@ -1,0 +1,8 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://game/gameplay/combat/combat_profile.gd" id="1"]
+[resource]
+script = ExtResource("1")
+equipment = "bat"
+damage = 30.0
+knockback = 1.1
+stun_duration = 0.55

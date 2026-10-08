@@ -1,5 +1,8 @@
 extends RefCounted
 
+const HUMAN := preload("res://game/gameplay/ai/humans/human_behavior.gd")
+var human: RefCounted
+
 # One brain per citizen: no movement state shared between NPCs.
 var actor: CharacterBody3D
 var world: Node3D
@@ -12,11 +15,11 @@ var last_position := Vector3.ZERO
 var has_waypoint := false
 var random := RandomNumberGenerator.new()
 var cached_target: CharacterBody3D
-var cached_threat: CharacterBody3D
 var perception_clock := 0.0
 var perception_interval := 0.2
 var movement_interval := 0.0
 var accumulated_delta := 0.0
+var movement_clock := 0.0
 var roam_speed := 1.15
 var hunt_speed := 3.6
 var hunt_radius := 6.0
@@ -28,28 +31,35 @@ func configure(body: CharacterBody3D, scene: Node3D, origin: Vector3, seed_value
 	last_position = actor.position
 	random.seed = seed_value
 	perception_clock = float(seed_value % 10) * 0.02
+	movement_clock = float(seed_value%13)*0.015
+	human = HUMAN.new()
+	human.configure(body,scene,origin,body.human_profile,seed_value)
 
 func tick(delta: float) -> void:
 	accumulated_delta += delta
-	if accumulated_delta < movement_interval:
+	movement_clock -= delta
+	if movement_interval > 0.0 and movement_clock > 0.0:
 		return
 	var step_delta := accumulated_delta
 	accumulated_delta = 0.0
+	movement_clock = movement_clock+movement_interval if movement_interval > 0.0 else 0.0
 	step(step_delta)
 
 func step(delta: float) -> void:
+	actor.tick_conditions(delta)
+	human.combat.tick(delta)
 	perception_clock -= delta
-	if actor.busy or actor.turning:
+	if actor.busy or actor.turning or actor.dead or actor.stun_time > 0.0:
 		mode = "recovering"
 		has_waypoint = false
 		pause = 0
 		return
 	if actor.zombie:
-		if perception_clock <= 0 or (is_instance_valid(cached_target) and (cached_target.infected or cached_target.busy)):
+		if perception_clock <= 0 or (is_instance_valid(cached_target) and not cached_target.can_be_hunted()):
 			cached_target = world.nearest_human(actor.position,hunt_radius)
 			perception_clock = perception_interval
 		var target: CharacterBody3D = cached_target
-		if is_instance_valid(target) and not target.infected and not target.busy:
+		if is_instance_valid(target) and target.can_be_hunted():
 			mode = "hunting"
 			has_waypoint = false
 			actor.travel(target.position,hunt_speed,delta)
@@ -62,20 +72,8 @@ func step(delta: float) -> void:
 			mode = "roaming"
 			roam(delta)
 		return
-	mode = "human"
-	if perception_clock <= 0:
-		cached_threat = world.nearest_zombie(actor.position,4.0)
-		perception_clock = perception_interval
-	var threat: CharacterBody3D = cached_threat
-	if is_instance_valid(threat) and threat.zombie:
-		var away: Vector3 = actor.position-threat.position
-		away.y = 0
-		if away.length() < 0.1:
-			away = Vector3.RIGHT
-		actor.travel(actor.position+away.normalized()*2,2.0,delta)
-	else:
-		var index_time: float = world.elapsed+home.x*0.17
-		actor.travel(home+Vector3(sin(index_time*0.5)*0.7,0,cos(index_time*0.4)*0.5),0.6,delta)
+	human.step(delta,perception_interval)
+	mode = human.state
 
 func roam(delta: float) -> void:
 	if pause > 0:

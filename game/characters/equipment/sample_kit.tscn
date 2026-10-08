@@ -1,0 +1,19 @@
+[gd_scene load_steps=4 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat"]
+albedo_color = Color(0.76,0.86,0.91,1)
+[sub_resource type="BoxMesh" id="Case"]
+size = Vector3(0.18,0.22,0.10)
+material = SubResource("Mat")
+[sub_resource type="CylinderMesh" id="Vial"]
+top_radius = 0.025
+bottom_radius = 0.025
+height = 0.16
+radial_segments = 8
+material = SubResource("Mat")
+[node name="SampleKit" type="Node3D"]
+[node name="Case" type="MeshInstance3D" parent="."]
+position = Vector3(0,-0.10,0)
+mesh = SubResource("Case")
+[node name="Vial" type="MeshInstance3D" parent="."]
+position = Vector3(0.10,-0.06,0)
+mesh = SubResource("Vial")

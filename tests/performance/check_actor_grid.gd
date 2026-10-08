@@ -35,9 +35,24 @@ func verify() -> void:
 	for actor in world.citizens:
 		if actor.detailed_visual:
 			detailed += 1
-	assert(detailed <= 64 and world.crowd_visuals.multimesh.instance_count == 1000)
+	assert(detailed <= world.detailed_actor_budget and world.crowd_visuals.multimesh.instance_count == 1000)
 	assert(world.actor_grid.candidate_checks < 200000)
 	print("Grid correctness passed: 200 queries match brute-force, bounded detail budget, 1000 proxy slots. Candidate checks=",world.actor_grid.candidate_checks)
+	var distant: CharacterBody3D
+	for actor in world.citizens:
+		if not actor.detailed_visual:
+			distant = actor
+			break
+	assert(is_instance_valid(distant.model) and distant.model.get_parent() == null)
+	world.player.position = distant.position
+	world.refresh_perception()
+	assert(distant.detailed_visual and distant.model.get_parent() == distant.visual)
+	for index in range(6):
+		world.player.position = Vector3(30 if index%2 == 0 else -30,0,20 if index%2 == 0 else -20)
+		world.refresh_perception()
+		for actor in world.citizens:
+			assert(actor.model.get_parent() == actor.visual if actor.detailed_visual else actor.model.get_parent() == null)
+	print("Crowd GLB LOD passed: detached models restore and cycle without duplicate children.")
 	world.queue_free()
 	await process_frame
 	quit()

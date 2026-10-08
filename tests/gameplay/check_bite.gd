@@ -2,6 +2,11 @@ extends SceneTree
 
 var world: Node3D
 
+func _process(delta: float) -> bool:
+	if is_instance_valid(world) and not world.is_physics_processing():
+		world.swarm_attacks.step(delta)
+	return false
+
 func _initialize() -> void:
 	call_deferred("verify")
 

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://game/gameplay/ai/humans/human_profile.gd" id="1"]
+[ext_resource type="Resource" path="res://game/gameplay/combat/profiles/gun.tres" id="2"]
+[resource]
+script = ExtResource("1")
+role = "armed_civilian"
+combat_profile = ExtResource("2")
+walk_speed = 1.2
+run_speed = 2.8
+reaction_delay = 0.4

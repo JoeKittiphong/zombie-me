@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/gameplay/ai/humans/human_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+role = "elder"
+vision_range = 5.0
+smell_range = 8.0
+smell_suspicion_rate = 0.9
+walk_speed = 0.55
+run_speed = 1.85
+stamina_capacity = 3.0
+reaction_delay = 0.5

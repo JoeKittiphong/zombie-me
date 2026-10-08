@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/gameplay/ai/humans/human_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+role = "doctor"
+vision_range = 8.0
+smell_range = 7.5
+investigates_smell = true
+smell_suspicion_rate = 0.85
+run_speed = 2.6
+reaction_delay = 0.4
+alarm_line = "Stay back!"

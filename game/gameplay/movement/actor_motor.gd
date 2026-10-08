@@ -4,13 +4,14 @@ const LOCOMOTION := preload("res://game/characters/dummy/dummy_locomotion.gd")
 var locomotion := LOCOMOTION.new()
 
 func travel(actor: CharacterBody3D, destination: Vector3, speed: float, delta: float) -> void:
-	if actor.busy:
+	if actor.busy or actor.dead or actor.stun_time > 0.0:
 		actor.velocity = Vector3.ZERO
 		return
 	var offset: Vector3 = destination-actor.position
 	offset.y = 0
-	var moving: bool = offset.length() > 0.12
-	actor.velocity = offset.normalized()*minf(speed,offset.length()/delta) if moving else Vector3.ZERO
+	var distance_sq := offset.length_squared()
+	var moving: bool = distance_sq > 0.0144
+	actor.velocity = offset*minf(speed/sqrt(distance_sq),1.0/delta) if moving else Vector3.ZERO
 	actor.velocity.y = -2.0
 	if actor.use_flat_movement:
 		actor.position += Vector3(actor.velocity.x,0,actor.velocity.z)*delta

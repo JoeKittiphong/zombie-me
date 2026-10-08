@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://game/gameplay/combat/combat_profile.gd" id="1"]
+[resource]
+script = ExtResource("1")
+equipment = "vaccine"
+attack_range = 1.7
+damage = 0.0
+windup = 0.12
+recovery = 0.65
+cooldown = 4.0

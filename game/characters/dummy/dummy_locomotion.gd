@@ -14,11 +14,21 @@ func animate(actor: CharacterBody3D, moving: bool, speed: float, delta: float) -
 	if actor.zombie:
 		actor.visual.rotation.z = sin(sway)*0.045
 		actor.head.rotation.x = 0.4
+		actor.head.rotation.y = 0.0
+	else:
+		var nervous: bool = actor.human_state in ["suspicious","investigating"]
+		var frightened: bool = actor.human_state in ["startled","fleeing","catching_breath"]
+		actor.head.rotation.x = sin(sway*2.0)*0.12 if nervous else (-0.1 if frightened else 0.0)
+		actor.head.rotation.y = sin(sway)*0.22 if nervous or actor.human_state == "catching_breath" else 0.0
+		actor.visual.rotation.z = sin(sway)*0.02 if actor.human_state == "catching_breath" else 0.0
 	var swing := sin(phase)*(0.22 if actor.zombie else 0.4) if moving else 0.0
 	for index in range(actor.limbs.size()):
 		actor.limbs[index].rotation.x = swing if index%2 == 0 else -swing
 		if actor.zombie and index%2 == 1:
-			actor.limbs[index].rotation.x -= 0.65
+			actor.limbs[index].rotation.x += 0.65
+		elif not actor.zombie and index%2 == 1 and actor.human_state in ["startled","fleeing","catching_breath"]:
+			actor.limbs[index].rotation.x -= 0.45
 	actor.visual.position.y = absf(sin(phase))*0.04 if moving else 0.0
+	actor.pose_equipment()
 
 

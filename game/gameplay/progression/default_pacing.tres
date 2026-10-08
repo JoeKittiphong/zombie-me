@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://game/gameplay/progression/pacing_settings.gd" id="1"]
+[resource]
+script = ExtResource("1")
+civilian_awareness_delay = 20.0
+minimum_attack_victims = 3
+police_response_delay = 1.25
+required_research_bodies = 5
+sample_duration = 6.0
+production_duration = 12.0
+sample_range = 1.6
+sample_search_range = 8.0
